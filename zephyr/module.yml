@@ -1,4 +1,4 @@
 name: boards_zephyr
 build:
   settings:
-   board_root: .
+   board_root: ..

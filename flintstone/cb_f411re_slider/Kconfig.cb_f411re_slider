@@ -1,0 +1,4 @@
+# C Barker Camer Slider v1.0
+
+config BOARD_CB_F411RE_SLIDER
+    select SOC_STM32F411XE

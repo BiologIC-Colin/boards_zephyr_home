@@ -1,0 +1,15 @@
+identifier: cb_f411re_slider
+name: CB F411RE Camera Slider
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+supported:
+  - counter
+  - gpio
+  - spi
+  - i2c
+ram: 128
+flash: 512
+vendor: flintstone

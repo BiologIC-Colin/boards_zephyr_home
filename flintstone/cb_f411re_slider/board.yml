@@ -1,0 +1,6 @@
+board:
+  name: cb_f411re_slider
+  full_name: Camera Slider V1
+  vendor: flintstone
+  socs:
+    - name: stm32f411xe

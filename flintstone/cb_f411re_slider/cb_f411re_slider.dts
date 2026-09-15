@@ -1,0 +1,283 @@
+/*
+ * Copyright (c) 2017 Linaro Limited
+ * Copyright (c) 2026 C Barker
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Board: Ki_Slider camera slider, STM32F411RE (U3, LQFP-64).
+ * Every pin below is taken from the KiCad netlist, not from the silkscreen.
+ */
+
+/dts-v1/;
+#include <st/f4/stm32f411Xe.dtsi>
+#include <st/f4/stm32f411r(c-e)tx-pinctrl.dtsi>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+#include <zephyr/dt-bindings/led/led.h>
+
+/ {
+	model = "CB STM32F411RE based camera slider board";
+	compatible = "flintstone,cb-f411re-slider";
+
+	chosen {
+		zephyr,console = &usart2;
+		zephyr,shell-uart = &usart2;
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+	};
+
+	leds: leds {
+		compatible = "gpio-leds";
+
+		led_0: led_0 {
+			/* PC4 -> R13 560R -> D3 anode, cathode to GND.
+			 * The MCU sources ~2.5 mA, so the LED is active HIGH.
+			 */
+			gpios = <&gpioc 4 GPIO_ACTIVE_HIGH>;
+			label = "Heartbeat";
+		};
+	};
+
+	/*
+	 * 3V3_ESP is a second LMR38020 buck (U2) gated by the MCU.
+	 * PC0 -> R5 150R -> U2 EN, with R6 10K pulling the net to GND so the
+	 * rail is OFF at reset while the STM32 GPIOs are still floating.
+	 * Nothing the MCU needs in order to boot lives on this rail.
+	 */
+	esp_3v3_reg: esp-3v3-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "3v3_esp";
+		enable-gpios = <&gpioc 0 GPIO_ACTIVE_HIGH>;
+		startup-delay-us = <5000>;
+		/* deliberately NOT regulator-boot-on: firmware decides when */
+	};
+
+	/*
+	 * Board signals with no upstream binding of their own.
+	 * Fetch with GPIO_DT_SPEC_GET(DT_PATH(zephyr_user), <name>_gpios).
+	 */
+	zephyr_user: zephyr,user {
+		/* --- ESP32-S3 (U6) supervision --------------------------- */
+
+		/* U2 PG, open drain + R8 100K pull-up to the always-on
+		 * 3V3_FIL rail, so it stays readable while 3V3_ESP is off.
+		 * High = 3V3_ESP is good.
+		 */
+		esp-pg-gpios = <&gpioc 1 GPIO_ACTIVE_HIGH>;
+
+		/* PC2 -> R18 1K -> ESP_EN (R20 10K pull-up to 3V3_ESP).
+		 * Drive active (low) to hold the ESP32 in reset.
+		 */
+		esp-rst-gpios = <&gpioc 2 GPIO_ACTIVE_LOW>;
+
+		/* PC3 -> R19 1K -> ESP_IO0 (R21 10K pull-up to 3V3_ESP).
+		 * Hold active (low) across the ESP32 reset release to enter
+		 * the serial bootloader; leave inactive for a normal boot.
+		 */
+		esp-boot-gpios = <&gpioc 3 GPIO_ACTIVE_LOW>;
+
+		/* ESP32-S3 IO21 -> PC5, direct, no pull fitted on the board.
+		 * GPIO_PULL_DOWN keeps the input defined while 3V3_ESP is off
+		 * and IO21 is high-Z.
+		 */
+		esp-ready-gpios = <&gpioc 5 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+
+		/* --- Camera trigger (J10, opto-isolated) ------------------ */
+
+		/* PB10 -> R16 560R -> U4 PC817 LED anode, cathode to GND.
+		 * PB12 -> R17 560R -> U5 PC817 LED anode, cathode to GND.
+		 * Active HIGH: driving the pin high lights the opto LED and
+		 * closes the camera-side contact. The camera side (J10) is
+		 * galvanically isolated - CAM_COM is NOT board ground.
+		 */
+		cam-shutter-gpios = <&gpiob 10 GPIO_ACTIVE_HIGH>;
+		cam-focus-gpios = <&gpiob 12 GPIO_ACTIVE_HIGH>;
+
+		/* --- TMC5130 (U7) extras --------------------------------- */
+
+		/* PB15 sits directly on the TMC_ENN net (U7 DRV_ENN, R25 10K
+		 * pull-up to 3V3_FIL). PB2 reaches that net only through JP1
+		 * or the J4 e-stop connector, so this pin is a READ-BACK: it
+		 * tells firmware whether the enable actually arrived at the
+		 * driver. Keep it an input - making it an output fights PB2.
+		 * Active low = driver enabled.
+		 */
+		tmc-enn-sense-gpios = <&gpiob 15 GPIO_ACTIVE_LOW>;
+
+		/* SWP_DIAG1. With SD_MODE=0 (U7 pin 11 strapped to GND) GCONF
+		 * bit 8 leaves DIAG1 as the position-compare output. R32 10K
+		 * pull-up to 3V3_FIL; the driver leaves DIAG1 open collector,
+		 * so it reads active low.
+		 */
+		tmc-diag1-gpios = <&gpiob 1 GPIO_ACTIVE_LOW>;
+
+		/* --- Spare expansion pins on J6 --------------------------- */
+		spare-gpios = <&gpiob 13 GPIO_ACTIVE_HIGH>,
+			      <&gpiob 14 GPIO_ACTIVE_HIGH>;
+	};
+
+	aliases {
+		led-heartbeat = &led_0;
+	};
+};
+
+&clk_lsi {
+	status = "okay";
+};
+
+&clk_hse {
+	/* X1: 8 MHz crystal on PH0/PH1 with 12pF load caps (C23/C25).
+	 * A real crystal, NOT an external clock source - do not set
+	 * hse-bypass here or HSE will never start.
+	 */
+	clock-frequency = <DT_FREQ_M(8)>;
+	status = "okay";
+};
+
+&pll {
+	div-m = <4>;
+	mul-n = <192>;
+	div-p = <4>;
+	div-q = <8>;
+	clocks = <&clk_hse>;
+	status = "okay";
+};
+
+&rcc {
+	clocks = <&pll>;
+	clock-frequency = <DT_FREQ_M(96)>;
+	ahb-prescaler = <1>;
+	apb1-prescaler = <2>;
+	apb2-prescaler = <1>;
+};
+
+/* USART1 -> ESP32-S3 (U6). The net names are from the ESP point of view:
+ * ESP_RXD is PA9 (STM32 TX) -> IO18, ESP_TXD is PA10 (STM32 RX) <- IO17.
+ */
+&usart1 {
+	pinctrl-0 = <&usart1_tx_pa9 &usart1_rx_pa10>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	status = "okay";
+};
+
+/* USART2 -> J11 debug header (pin 1 GND, pin 4 = PA3 RX, pin 5 = PA2 TX). */
+&usart2 {
+	pinctrl-0 = <&usart2_tx_pa2 &usart2_rx_pa3>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	status = "okay";
+};
+
+/*
+ * SPI1 -> TMC5130 (U7). PA4 is used as a plain GPIO chip select, so
+ * spi1_nss_pa4 is deliberately left out of pinctrl-0.
+ */
+&spi1 {
+	pinctrl-0 = <&spi1_sck_pa5 &spi1_miso_pa6 &spi1_mosi_pa7>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpioa 4 GPIO_ACTIVE_LOW>;
+	status = "okay";
+
+	tmc5130: tmc5130@0 {
+		compatible = "flintstone,tmc51xx";
+		reg = <0>;
+
+		/* TMC5130A is SPI mode 3; the driver hardcodes CPOL|CPHA.
+		 * Lands on 3 MHz after the APB2 prescaler, well inside spec.
+		 */
+		spi-max-frequency = <DT_FREQ_M(4)>;
+
+		/* U7 CLK (pin 2) is strapped to GND, so the internal
+		 * oscillator is used. Datasheet fCLKOSC is 13.2 MHz typical
+		 * at tJ=50C but spans 10.1-17.2 MHz over temperature, and
+		 * every velocity/acceleration conversion scales with it.
+		 * Measure a real part if you need accurate speeds.
+		 */
+		clock-frequency = <13200000>;
+
+		/* SWN_DIAG0 -> PB0. With SD_MODE=0, GCONF bit 7 leaves DIAG0
+		 * as the interrupt output, and the driver sets bit 12 to make
+		 * it push-pull active high whenever diag0-gpios is present.
+		 * RAMP_STAT event_stop_l/_r, event_pos_reached and
+		 * event_stop_sg are ORed onto it, which is what makes
+		 * interrupt-driven end-stop handling work instead of polling.
+		 * R33 10K pull-up to 3V3_FIL only defines the line pre-init.
+		 */
+		diag0-gpios = <&gpiob 0 GPIO_ACTIVE_HIGH>;
+
+		/* StealthChop: quiet, and this board homes on hall switches
+		 * rather than stallGuard, so nothing needs spreadCycle.
+		 */
+		en-pwm-mode;
+
+		status = "okay";
+
+		tmc5130_driver: stepper-driver {
+			compatible = "flintstone,tmc51xx-stepper-driver";
+			micro-step-res = <256>;
+
+			/* DRV_ENN is active-HIGH disable and carries R25 10K
+			 * to 3V3_FIL, so the power stage is off until firmware
+			 * pulls it down. PB2 reaches it through JP1 (jumper)
+			 * or J4 (external e-stop in the same position), so an
+			 * opened e-stop lets R25 disable the driver in
+			 * hardware with no firmware in the loop.
+			 * GPIO_ACTIVE_LOW makes stepper_enable() drive PB2 low.
+			 */
+			en-gpios = <&gpiob 2 GPIO_ACTIVE_LOW>;
+		};
+
+		tmc5130_ctrl: motion-controller {
+			compatible = "flintstone,tmc51xx-stepper-ctrl";
+
+			/* Hall end stops reach the TMC directly, not the MCU:
+			 * J8 -> R26/R27 10K pull-ups to 3V3_FIL -> R28/R29 22K
+			 * with C32/C33 1nF -> U7.8 REFL and U7.9 REFR.
+			 * The pull-ups mean an idle or unfitted switch sits
+			 * HIGH, so both inputs are inverted (pol-stop-*) and a
+			 * switch pulling its input LOW is what stops the motor.
+			 * REFR is enabled too so an unfitted right-hand switch
+			 * reads as "not triggered" rather than stopping motion.
+			 */
+			stop-l-enable;
+			stop-r-enable;
+			pol-stop-l;
+			pol-stop-r;
+
+			/* Ramp values are in TMC internal units.
+			 * v[Hz] = v[reg] * fCLK / 2^24; at 13.2 MHz one unit
+			 * is 0.787 ustep/s, so vmax 100000 is ~78.7 kustep/s
+			 * (~1.5 rev/s on a 200-step motor at 256 microsteps).
+			 */
+			vstart = <0>;
+			a1 = <1000>;
+			v1 = <50000>;
+			amax = <500>;
+			vmax = <100000>;
+			dmax = <700>;
+			d1 = <1400>;
+			vstop = <10>;
+			tzerowait = <100>;
+
+			/* Motor current, R30/R31 = 0.15R sense:
+			 *   Irms = (CS+1)/32 * 0.325/(0.15+0.02) / sqrt(2)
+			 *        = (CS+1)/32 * 1.352 A
+			 * irun 16 -> ~0.72 A rms, ihold 8 -> ~0.38 A rms.
+			 * Deliberately conservative - raise to suit the motor
+			 * actually fitted before tuning anything else.
+			 */
+			irun = <16>;
+			ihold = <8>;
+			iholddelay = <6>;
+			tpowerdown = <10>;
+		};
+	};
+};
+
+&rtc {
+	clocks = <&rcc STM32_CLOCK(APB1, 28)>,
+		 <&rcc STM32_SRC_LSI RTC_SEL(2)>;
+	status = "okay";
+};
