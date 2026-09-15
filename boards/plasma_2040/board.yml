@@ -1,6 +1,0 @@
-board:
-  name: plasma_2040
-  vendor: raspberrypi
-  socs:
-  - name: rp2040
-
