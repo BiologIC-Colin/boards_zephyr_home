@@ -157,9 +157,29 @@
  */
 &usart1 {
 	pinctrl-0 = <&usart1_tx_pa9 &usart1_rx_pa10>;
-	pinctrl-names = "default";
+	/* There are no series resistors on this pair - PA9 goes straight to the
+	 * ESP's IO18 - so an idle-high TX line would push current through the
+	 * module's ESD diodes whenever 3V3_ESP is off, and partly power a rail
+	 * the STM32 believes it has switched off. The sleep state parks both
+	 * pins as analog inputs; firmware suspends the port with the rail.
+	 */
+	pinctrl-1 = <&analog_pa9 &analog_pa10>;
+	pinctrl-names = "default", "sleep";
 	current-speed = <115200>;
 	status = "okay";
+};
+
+/*
+ * The ESP holds IO17 high-Z from reset until its own pinctrl runs, which leaves
+ * the STM32's RX floating for ~100 ms every time the module restarts. Floating
+ * means framing errors and a stray byte or two arriving as a bogus message, so
+ * bias the line to its idle level. The SoC pinctrl for this pin does not do it.
+ *
+ * The pull is only live while the port is; the sleep state above parks PA10 as
+ * an analog input, so nothing feeds the module when 3V3_ESP is off.
+ */
+&usart1_rx_pa10 {
+	bias-pull-up;
 };
 
 /* USART2 -> J11 debug header (pin 1 GND, pin 4 = PA3 RX, pin 5 = PA2 TX). */
