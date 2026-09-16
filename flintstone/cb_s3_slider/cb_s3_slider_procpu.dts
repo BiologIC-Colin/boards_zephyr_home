@@ -1,0 +1,134 @@
+/*
+ * Copyright (c) 2026 C Barker
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The ESP32-S3 half of the Ki_Slider camera slider board (U6,
+ * ESP32-S3-WROOM-1-N16R8). The STM32 half is boards/flintstone/cb_f411re_slider.
+ *
+ * This module has no power switch of its own: 3V3_ESP is gated by the STM32
+ * (PC0), and EN and IO0 are driven by the STM32 too. Nothing here runs until
+ * the STM32 has enabled the rail. See this board's README.
+ */
+
+/dts-v1/;
+
+#include <espressif/esp32s3/esp32s3_wroom_n16r8.dtsi>
+#include <espressif/partitions_0x0_default_16M.dtsi>
+#include "cb_s3_slider-pinctrl.dtsi"
+
+/ {
+	model = "CB ESP32-S3 camera slider PROCPU";
+	compatible = "espressif,esp32s3";
+
+	chosen {
+		zephyr,sram = &sram1;
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+		zephyr,flash = &flash0;
+		zephyr,code-partition = &slot0_partition;
+		zephyr,bt-hci = &esp32_bt_hci;
+	};
+
+	leds: leds {
+		compatible = "gpio-leds";
+
+		led_0: led_0 {
+			/* IO48 -> R22 560R -> D5 anode, cathode to GND.
+			 * Same circuit as the STM32's heartbeat (R13/D3), so the
+			 * pin sources the current and the LED is active HIGH.
+			 */
+			gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;
+			label = "ESP Heartbeat";
+		};
+	};
+
+	/*
+	 * Board signals with no binding of their own.
+	 * Fetch with GPIO_DT_SPEC_GET(DT_PATH(zephyr_user), <name>_gpios).
+	 */
+	zephyr_user: zephyr,user {
+		/* IO21 -> STM32 PC5. Drive high to tell the STM32 this side is
+		 * up. The STM32 holds a pull-down on its end, so the line reads
+		 * low while 3V3_ESP is off and IO21 is high-Z.
+		 */
+		ready-gpios = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+
+		/* Display control lines on J7, alongside the SPI bus. */
+		disp-pwr-gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
+		disp-dc-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+		disp-rst-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+		disp-bl-busy-gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+	};
+
+	aliases {
+		led-heartbeat = &led_0;
+		watchdog0 = &wdt0;
+	};
+};
+
+/* No USB on this design - U6 pins 13 and 14 are unconnected, so UART0 on J9 is
+ * the only way in.
+ */
+&usb_serial {
+	status = "disabled";
+};
+
+/* UART0 -> J9 header: console, shell and esptool all arrive here. */
+&uart0 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart0_default>;
+	pinctrl-names = "default";
+};
+
+/* UART1 -> STM32 USART1 (PA9/PA10). */
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart1_default>;
+	pinctrl-names = "default";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+/* I2C expansion on J3, with R23/R24 4.7K pull-ups fitted on the board. */
+&i2c0 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_FAST>;
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-names = "default";
+};
+
+/* Display header J7. Left enabled so a panel can be added without a board
+ * change; nothing is attached by default.
+ */
+&spi2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+	pinctrl-0 = <&spim2_default>;
+	pinctrl-names = "default";
+};
+
+&wdt0 {
+	status = "okay";
+};
+
+&trng0 {
+	status = "okay";
+};
+
+&esp32_bt_hci {
+	status = "okay";
+};
+
+&wifi {
+	status = "okay";
+};

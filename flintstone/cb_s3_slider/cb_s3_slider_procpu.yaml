@@ -1,0 +1,14 @@
+identifier: cb_s3_slider/esp32s3/procpu
+name: CB ESP32-S3 Camera Slider PROCPU
+type: mcu
+arch: xtensa
+toolchain:
+  - zephyr
+supported:
+  - gpio
+  - uart
+  - i2c
+  - spi
+ram: 345
+flash: 16384
+vendor: flintstone

@@ -1,0 +1,6 @@
+board:
+  name: cb_s3_slider
+  full_name: Camera Slider V1 (ESP32-S3 side)
+  vendor: flintstone
+  socs:
+    - name: esp32s3

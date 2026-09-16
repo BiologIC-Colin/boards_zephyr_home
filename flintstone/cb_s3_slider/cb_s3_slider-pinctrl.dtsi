@@ -1,0 +1,75 @@
+/*
+ * Copyright (c) 2026 C Barker
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Pin assignments taken from the Ki_Slider KiCad netlist (U6,
+ * ESP32-S3-WROOM-1-N16R8).
+ */
+
+#include <zephyr/dt-bindings/pinctrl/esp-pinctrl-common.h>
+#include <zephyr/dt-bindings/pinctrl/esp32s3-pinctrl.h>
+#include <zephyr/dt-bindings/pinctrl/esp32s3-gpio-sigmap.h>
+
+&pinctrl {
+	/* UART0 -> J9 programming / console header.
+	 * J9: 1 = 3V3_ESP (an OUTPUT of this board), 2 = GND,
+	 *     3 = TXD0, 4 = RXD0, 5 = IO0, 6 = EN.
+	 */
+	uart0_default: uart0_default {
+		group1 {
+			pinmux = <UART0_TX_GPIO43>;
+			output-high;
+		};
+
+		group2 {
+			pinmux = <UART0_RX_GPIO44>;
+			bias-pull-up;
+		};
+	};
+
+	/* UART1 -> STM32 USART1. The net names on the schematic are from the
+	 * ESP's point of view: ESP_RXD is IO18 (driven by STM32 PA9) and
+	 * ESP_TXD is IO17 (read by STM32 PA10).
+	 */
+	uart1_default: uart1_default {
+		group1 {
+			pinmux = <UART1_TX_GPIO17>;
+			output-high;
+		};
+
+		group2 {
+			pinmux = <UART1_RX_GPIO18>;
+			bias-pull-up;
+		};
+	};
+
+	/* I2C on J3. R23/R24 4.7K pull-ups are fitted on the board, so bare
+	 * modules with no pull-ups of their own still work.
+	 */
+	i2c0_default: i2c0_default {
+		group1 {
+			pinmux = <I2C0_SDA_GPIO8>,
+				 <I2C0_SCL_GPIO9>;
+			bias-pull-up;
+			drive-open-drain;
+			output-high;
+		};
+	};
+
+	/* SPI display on J7, write only - there is no MISO on this header.
+	 * IO10-IO12 are FSPI pins so the bus skips the GPIO matrix.
+	 * IO13 is DISP_PWR, IO14 DISP_DC, IO15 DISP_RST and IO16 DISP_BL_BUSY;
+	 * all four are plain GPIOs, exposed through zephyr,user.
+	 */
+	spim2_default: spim2_default {
+		group1 {
+			pinmux = <SPIM2_SCLK_GPIO12>,
+				 <SPIM2_CSEL_GPIO10>;
+		};
+
+		group2 {
+			pinmux = <SPIM2_MOSI_GPIO11>;
+			output-low;
+		};
+	};
+};
