@@ -292,6 +292,22 @@
 			ihold = <8>;
 			iholddelay = <6>;
 			tpowerdown = <10>;
+
+			/* Hand the chopper over to spreadCycle above ~100 mm/s.
+			 *
+			 * StealthChop is quiet but loses torque with speed, and
+			 * with a camera-sized load on the carriage it stalled
+			 * between 300 and 360 mm/s. Filming moves sit far below
+			 * 100 mm/s, so they stay silent; traverses and homing
+			 * get spreadCycle's high-speed torque instead.
+			 *
+			 * TPWMTHRS is compared against TSTEP, the interval
+			 * between microsteps in fCLK ticks, and the chopper
+			 * switches when TSTEP falls below it. 100 mm/s at
+			 * 60 mm/rev is 85333 usteps/s, so
+			 * TSTEP = 13.2 MHz / 85333 = 155.
+			 */
+			tpwmthrs = <155>;
 		};
 	};
 };
