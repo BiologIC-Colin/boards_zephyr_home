@@ -1,0 +1,44 @@
+/*
+ * Copyright (c) 2026 C Barker
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Flash layout for the 16 MB ESP32-S3-WROOM-1-N16R8.
+ *
+ * Espressif's stock 16M layout splits the flash into two 7.7 MB OTA slots and
+ * leaves only 192 KB of storage. This board is flashed over the wire from a
+ * J9 header rather than over the air, so the second slot earns nothing and the
+ * space is far more useful as a filesystem: sequences, settings, and display
+ * assets when the J7 panel goes on.
+ *
+ * Offsets below 0x7e0000 are unchanged from the stock layout so the boot image
+ * and code partition land exactly where the toolchain already expects.
+ */
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x0 DT_SIZE_K(64)>;
+		};
+
+		sys_partition: partition@10000 {
+			label = "sys";
+			reg = <0x10000 DT_SIZE_K(64)>;
+		};
+
+		slot0_partition: partition@20000 {
+			label = "image-0";
+			reg = <0x20000 DT_SIZE_K(7936)>;
+		};
+
+		/* Reclaimed from the unused second OTA slot. */
+		storage_partition: partition@7e0000 {
+			label = "storage";
+			reg = <0x7e0000 DT_SIZE_M(8)>;
+		};
+	};
+};

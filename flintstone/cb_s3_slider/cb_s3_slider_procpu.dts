@@ -14,7 +14,7 @@
 /dts-v1/;
 
 #include <espressif/esp32s3/esp32s3_wroom_n16r8.dtsi>
-#include <espressif/partitions_0x0_default_16M.dtsi>
+#include "cb_s3_slider-partitions.dtsi"
 #include "cb_s3_slider-pinctrl.dtsi"
 
 / {
@@ -59,6 +59,26 @@
 		disp-dc-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
 		disp-rst-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
 		disp-bl-busy-gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+	};
+
+	/* LittleFS over the reclaimed OTA slot. Sequences, settings and, later,
+	 * assets for the J7 display all live here; the web UI itself ships
+	 * inside the firmware so it can never disagree with the API it calls.
+	 */
+	fstab {
+		compatible = "zephyr,fstab";
+
+		lfs_data: lfs_data {
+			compatible = "zephyr,fstab,littlefs";
+			mount-point = "/lfs";
+			partition = <&storage_partition>;
+			automount;
+			read-size = <64>;
+			prog-size = <64>;
+			cache-size = <256>;
+			lookahead-size = <64>;
+			block-cycles = <512>;
+		};
 	};
 
 	aliases {
